@@ -350,7 +350,7 @@ function calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, area, gri
     }
     // соединитель и подвес у Классики не округляются до коробки в калькуляторе поставщика — прямой расчёт
     rows.push({ name: "Соединительный элемент", qty: Math.ceil(cellNorms.connector * area), unit: "шт", costPerUnit: GRILIATO_CLASSIC_CONNECTOR_PRICE });
-    rows.push({ name: "Подвес", qty: Math.ceil(cellNorms.suspension * area), unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE });
+    rows.push({ name: "Подвес", qty: ceilToMultiple(cellNorms.suspension * area, 100), unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE });
     const cornerM = ceilToMultiple(GRILIATO_CORNER_PER_M2_M * area, GRILIATO_CORNER_BOX_MULTIPLE_M);
     rows.push({ name: "Уголок пристеночный (L=3м)", qty: ceilToMultiple(cornerM / 3, 1), unit: "шт", costPerUnit: GRILIATO_CLASSIC_CORNER_PRICE_PER_M * 3 });
     return rows;
@@ -380,7 +380,7 @@ function calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, area, gri
     { name: "Т-профиль 600мм", qty: ceilToMultiple(t600M / 0.6, 1), unit: "шт", costPerUnit: pricePerM * 0.6 },
     { name: "Т-профиль 1200мм", qty: ceilToMultiple(t1200M / 1.2, 1), unit: "шт", costPerUnit: pricePerM * 1.2 },
     { name: "Т-профиль 3600мм", qty: ceilToMultiple(t3600M / 3.6, 1), unit: "шт", costPerUnit: pricePerM * 3.6 },
-    { name: "Подвес", qty: Math.ceil(n.suspension * area), unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE },
+    { name: "Подвес", qty: ceilToMultiple(n.suspension * area, 100), unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE },
     { name: "Уголок пристеночный (L=3м)", qty: ceilToMultiple(cornerM / 3, 1), unit: "шт", costPerUnit: GRILIATO_CLASSIC_CORNER_PRICE_PER_M * 3 }
   ];
 }
@@ -806,9 +806,10 @@ export default function CeilingCalculator() {
       const colorForPrice = color === CUSTOM_COLOR_KEY ? "white" : color;
 
       // Только материал, без монтажа и без поправки на сложность — точная цена за материал по площади.
+      // Цвет уже указан в шапке документа, в каждой строке таблицы не дублируем.
       const breakdown = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorForPrice, a, griliatoCell);
       const materialRows = breakdown.map((item) => ({
-        name: `${item.name}${colorSuffix}`,
+        name: item.name,
         qty: item.qty,
         unit: item.unit,
         price: item.costPerUnit * colorMult * markupMult,
@@ -936,6 +937,7 @@ export default function CeilingCalculator() {
 
   <h1>Коммерческое предложение № ${kpNumber} от ${dateStr} г.</h1>
   <div class="subtitle">Подвесной потолок: расчёт стоимости</div>
+  ${isGriliato ? `<div class="subtitle" style="margin-top:-14px;">${GRILIATO_TYPE_LABELS[griliatoType]}, ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}, ячейка ${griliatoCell} мм${colorText ? `, цвет: ${colorText}` : ""}</div>` : ""}
 
   <div class="meta">
     <b>Исполнитель:</b> ООО "ГЛАССВЭЙ"<br/>
