@@ -290,7 +290,8 @@ const GRILIATO_GL15_NORMS_PER_M2 = {
   t600: 0.84,
   t1200: 1.68,
   t3600: 0.84,
-  suspension: 0.7
+  suspension: 0.7,
+  corner: GRILIATO_CORNER_PER_M2_M
 };
 
 const GRILIATO_TYPE_LABELS = {
@@ -331,19 +332,21 @@ function calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, area, gri
     return rows;
   }
 
-  // GL-15: мама/папа по той же таблице ячеек, что и Классика + L-профиль + Т-600/1200/3600 + подвес
-  // (подсистема L-профиль/Т-профили/подвес не зависит от ячейки — фиксированные нормы)
+  // GL-15: мама/папа по той же таблице ячеек, что и Классика + L-профиль + Т-600/1200/3600 + подвес + уголок
+  // (подсистема L-профиль/Т-профили/подвес/уголок не зависит от ячейки — фиксированные нормы)
   const n = GRILIATO_GL15_NORMS_PER_M2;
   const mamaPieces = (cellNorms.mama * area) / GRILIATO_PIECE_LENGTH;
   const papaPieces = (cellNorms.papa * area) / GRILIATO_PIECE_LENGTH;
   return [
     { name: "Грильято GL-15, элемент «мама»", qty: mamaPieces, unit: "шт", costPerUnit: pricePerPiece },
     { name: "Грильято GL-15, элемент «папа»", qty: papaPieces, unit: "шт", costPerUnit: pricePerPiece },
-    { name: "L-профиль", qty: n.lProfile * area / GRILIATO_PIECE_LENGTH, unit: "шт", costPerUnit: pricePerM * GRILIATO_PIECE_LENGTH },
+    // L-профиль всегда стоит вдвое дешевле мамы/папы за штуку (тот же шаг 0.6м, но другой профиль металла)
+    { name: "L-профиль", qty: n.lProfile * area / GRILIATO_PIECE_LENGTH, unit: "шт", costPerUnit: pricePerPiece * 0.5 },
     { name: "Т-профиль 600мм", qty: n.t600 * area / 0.6, unit: "шт", costPerUnit: pricePerM * 0.6 },
     { name: "Т-профиль 1200мм", qty: n.t1200 * area / 1.2, unit: "шт", costPerUnit: pricePerM * 1.2 },
     { name: "Т-профиль 3600мм", qty: n.t3600 * area / 3.6, unit: "шт", costPerUnit: pricePerM * 3.6 },
-    { name: "Подвес", qty: n.suspension * area, unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE }
+    { name: "Подвес", qty: n.suspension * area, unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE },
+    { name: "Уголок пристеночный (L=3м)", qty: (n.corner * area) / 3, unit: "шт", costPerUnit: GRILIATO_CLASSIC_CORNER_PRICE_PER_M * 3 }
   ];
 }
 
