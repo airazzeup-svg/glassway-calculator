@@ -660,12 +660,32 @@ export default function CeilingCalculator() {
     const a = Math.max(0, Number(area) || 0);
     const isCustomColor = color === CUSTOM_COLOR_KEY;
     const colorMult = isCustomColor ? 1 + Number(customColorMarkup) / 100 : 1;
-    const costWithColor = baseCostPerM2 * colorMult;
-    const sellPricePerM2 = costWithColor * (1 + Number(markup) / 100);
-    const materialAndWork = sellPricePerM2 * a;
-    // минимальный заказ — типично для рынка подвесных потолков
+    const markupMult = 1 + Number(markup) / 100;
+
+    // Грильято считается отдельно от остальных систем: округление до коробки работает только
+    // на реальной площади объекта (не на условном 1м²), поэтому себестоимость и продажную цену
+    // берём из суммы реальных постатейных позиций, а не из costPerM2 * area.
+    let griliatoBreakdownRows = null;
+    let total, sellPricePerM2, costWithColor, isMinOrderFlag;
     const minOrder = 25000;
-    const total = Math.max(materialAndWork, minOrder);
+
+    if (isGriliato) {
+      const colorForNorms = isCustomColor ? "white" : color;
+      griliatoBreakdownRows = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorForNorms, a, griliatoCell);
+      const materialCostSum = griliatoBreakdownRows.reduce((s, r) => s + r.qty * r.costPerUnit, 0) * colorMult;
+      const materialSellSum = materialCostSum * markupMult;
+      total = Math.max(materialSellSum, a > 0 ? minOrder : 0);
+      sellPricePerM2 = a > 0 ? total / a : 0;
+      costWithColor = a > 0 ? materialCostSum / a : 0;
+      isMinOrderFlag = materialSellSum < minOrder && a > 0;
+    } else {
+      costWithColor = baseCostPerM2 * colorMult;
+      sellPricePerM2 = costWithColor * markupMult;
+      const materialAndWork = sellPricePerM2 * a;
+      total = Math.max(materialAndWork, minOrder);
+      isMinOrderFlag = materialAndWork < minOrder;
+    }
+
     const days = Math.max(1, Math.ceil(a / (sys.speed === "быстрый" ? 40 : sys.speed === "средний" ? 28 : 20)));
 
     // Расход материала для Кубо — формула Файнберга: модуль = (ширина рейки + шаг) / 1000
@@ -684,21 +704,13 @@ export default function CeilingCalculator() {
       stringerSparse = a / 1.2;
     }
 
-    // Расход материала для Грильято — точные нормы из калькулятора Grand Line (через единую функцию breakdown).
-    // Считается строго по площади, без поправки на сложность и без монтажа — по требованию: только материал.
-    let griliatoBreakdownRows = null;
-    if (isGriliato) {
-      const colorForNorms = color === CUSTOM_COLOR_KEY ? "white" : color;
-      griliatoBreakdownRows = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorForNorms, a, griliatoCell);
-    }
-
     return {
       area: a,
       pricePerM2Adjusted: sellPricePerM2,
       costPerM2: costWithColor,
       total,
       days,
-      isMinOrder: materialAndWork < minOrder,
+      isMinOrder: isMinOrderFlag,
       railLength,
       stringerDense,
       stringerSparse,
