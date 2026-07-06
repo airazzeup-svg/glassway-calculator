@@ -78,6 +78,95 @@ const KUBO_WORK_PER_M2 = 400; // руб/м2 — типовая стоимост�
 const GRILIATO_WORK_PER_M2 = 450; // руб/м2 — типовая стоимость монтажа Грильято
 const KUBO_FITTINGS_PER_M2 = 60; // руб/м2 — соединительные элементы и торцевые заглушки (не входят в прайс Декоформ)
 
+// ---------- Кубообразная рейка Primet (прайс "Кубообразная рейка PRiMET", июль 2026, цены дилер) ----------
+// В отличие от Декоформ (цена уже за м² под конкретный шаг), у Primet цена дана за ПОГОННЫЙ МЕТР рейки,
+// а шаг между рейками — свободный параметр их же калькулятора (лист "Калькулятор"). Формула расхода
+// повторяет их калькулятор: модуль = (ширина рейки + шаг) / 1000, расход = площадь / модуль.
+// Гребёнка/подвесы/соединители/заглушки/угол у Primet даны только нормами расхода (без цены на сами
+// комплектующие) — используем ту же усреднённую надбавку KUBO_FITTINGS_PER_M2, что и для Декоформ.
+const KUBO_PRIMET_SIZES = ["30x40", "30x60", "30x80", "30x100", "30x160", "40x40", "50x50", "50x70", "50x90", "50x150", "80x55", "80x75", "80x100", "80x135"];
+const KUBO_PRIMET_MATERIAL_LABELS = { aluminum: "Алюминий", zinc: "Оцинковка" };
+const KUBO_PRIMET_COLOR_LABELS = {
+  white: "Белый матовый",
+  graphite: "Графит",
+  metallic: "Серебристый металлик",
+  light_oak: "Светлый дуб",
+  dark_oak: "Тёмный орех",
+  honey_oak: "Медовый дуб",
+  black: "Чёрный"
+};
+// Цены за ПОГОННЫЙ МЕТР рейки, руб. с НДС, дилерская цена.
+const KUBO_PRIMET_RAIL_PRICES = {
+  "30x40": {
+    aluminum: { white: 137, graphite: 144, metallic: 142, light_oak: 205, dark_oak: 205, honey_oak: 221, black: 144 },
+    zinc: { white: 105, black: 113 }
+  },
+  "30x60": {
+    aluminum: { white: 179, graphite: 187, metallic: 186, light_oak: 267, dark_oak: 267, honey_oak: 293, black: 186 },
+    zinc: { white: 110, black: 115 }
+  },
+  "30x80": {
+    aluminum: { white: 223, graphite: 233, metallic: 231, light_oak: 335, dark_oak: 335, honey_oak: 364, black: 233 },
+    zinc: { white: 172, black: 186 }
+  },
+  "30x100": {
+    aluminum: { white: 267, graphite: 279, metallic: 276, dark_oak: 400, light_oak: 400, honey_oak: 436, black: 279 },
+    zinc: { white: 227, black: 221 }
+  },
+  "30x160": {
+    aluminum: { white: 478, light_oak: 598, dark_oak: 598, honey_oak: 651 },
+    zinc: { white: 480, graphite: 480, black: 480 }
+  },
+  "40x40": {
+    aluminum: { white: 147, graphite: 155, metallic: 153, light_oak: 220, dark_oak: 220, honey_oak: 240, black: 155 },
+    zinc: { white: 114, black: 122 }
+  },
+  "50x50": {
+    aluminum: { white: 181, graphite: 189, metallic: 187, light_oak: 271, dark_oak: 271, honey_oak: 295, black: 189 },
+    zinc: { white: 140, black: 150 }
+  },
+  "50x70": {
+    aluminum: { white: 225, graphite: 235, metallic: 233, light_oak: 336, dark_oak: 336, honey_oak: 366, black: 235 },
+    zinc: { white: 173, black: 187 }
+  },
+  "50x90": {
+    aluminum: { white: 269, graphite: 284, metallic: 278, light_oak: 403, dark_oak: 403, honey_oak: 438, black: 283 },
+    zinc: { white: 229, black: 223 }
+  },
+  "50x150": {
+    aluminum: { white: 482, light_oak: 603, dark_oak: 603, honey_oak: 656 },
+    zinc: { white: 486, graphite: 486, black: 486 }
+  },
+  "80x55": {
+    aluminum: { white: 226, graphite: 236, metallic: 233, light_oak: 337, dark_oak: 337, honey_oak: 367, black: 236 },
+    zinc: { white: 178, black: 190 }
+  },
+  "80x75": {
+    aluminum: { white: 272, graphite: 284, metallic: 281, light_oak: 406, dark_oak: 406, honey_oak: 441, black: 284 },
+    zinc: { white: 233, black: 228 }
+  },
+  "80x100": {
+    aluminum: { white: 404, light_oak: 490, dark_oak: 490, honey_oak: 511 },
+    zinc: { white: 456, graphite: 456, black: 456 }
+  },
+  "80x135": {
+    aluminum: { white: 491, light_oak: 618, dark_oak: 618, honey_oak: 665 },
+    zinc: { white: 506, graphite: 506, black: 506 }
+  }
+};
+
+function getKuboPrimetWidth(size) {
+  return Number(size.split("x")[0]);
+}
+
+function calcKuboPrimetCostPerM2(size, material, color, gapMm) {
+  const railPrice = (KUBO_PRIMET_RAIL_PRICES[size] && KUBO_PRIMET_RAIL_PRICES[size][material] && KUBO_PRIMET_RAIL_PRICES[size][material][color]) || 0;
+  const width = getKuboPrimetWidth(size);
+  const moduleM = (width + Number(gapMm)) / 1000;
+  const railPerM2 = moduleM > 0 ? 1 / moduleM : 0;
+  return railPerM2 * railPrice + KUBO_FITTINGS_PER_M2;
+}
+
 // ---------- Кубообразная рейка Grand Line (Металлист, счёт №УО-00813525 от 23.06.2026) ----------
 // Деревянная фактура Al 0.4мм, цена практически линейна по длине — храним за метр погонный.
 // Шаг ячейки в счёте не указан явно — принят типовой шаг 50мм (расход 10 м.п./м2) как ориентир.
@@ -732,12 +821,15 @@ function formatRub(n) {
   return Math.round(n).toLocaleString("ru-RU") + " ₽";
 }
 
-function getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType) {
+function getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType, kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap) {
   if (kuboSupplier === "grandline_wood") {
     return `Кубообразный потолок — Grand Line, ${KUBO_GRANDLINE_WOOD[kuboWoodType].label}`;
   }
   if (kuboSupplier === "decoform_loft") {
     return `Decoform ${DECOFORM_LOFT_TYPES[kuboLoftType].label}`;
+  }
+  if (kuboSupplier === "primet") {
+    return `Кубообразный потолок (Primet) — ${kuboPrimetSize.replace("x", "×")}мм, шаг ${kuboPrimetGap}мм, ${KUBO_PRIMET_MATERIAL_LABELS[kuboPrimetMaterial]}, ${KUBO_PRIMET_COLOR_LABELS[kuboPrimetColor]}`;
   }
   return `Кубообразный потолок — ${KUBO_PANELS[kuboPanel].label}, оцинковка`;
 }
@@ -778,6 +870,10 @@ export default function CeilingCalculator() {
   const [kuboWoodType, setKuboWoodType] = useState(saved.kuboWoodType || "brazilian_cherry");
   const [kuboLoftType, setKuboLoftType] = useState(saved.kuboLoftType || "loft_50_40");
   const [kuboLoftPaint, setKuboLoftPaint] = useState(saved.kuboLoftPaint ?? false);
+  const [kuboPrimetSize, setKuboPrimetSize] = useState(saved.kuboPrimetSize || "50x50");
+  const [kuboPrimetMaterial, setKuboPrimetMaterial] = useState(saved.kuboPrimetMaterial || "aluminum");
+  const [kuboPrimetColor, setKuboPrimetColor] = useState(saved.kuboPrimetColor || "white");
+  const [kuboPrimetGap, setKuboPrimetGap] = useState(saved.kuboPrimetGap ?? 50); // шаг между рейками, мм
   const [cassetteSupplier, setCassetteSupplier] = useState(saved.cassetteSupplier || "eco"); // eco | grandline_closed
   const [griliatoType, setGriliatoType] = useState(saved.griliatoType || "classic"); // classic | gl15
   const [griliatoHeight, setGriliatoHeight] = useState(saved.griliatoHeight || "eco30"); // eco30 | standard40
@@ -809,14 +905,16 @@ export default function CeilingCalculator() {
   useEffect(() => {
     saveParams({
       mode, system, tier, armstrongBoard, kuboPanel, kuboSupplier, kuboWoodType,
-      kuboLoftType, kuboLoftPaint, cassetteSupplier, griliatoType, griliatoHeight, griliatoCell,
+      kuboLoftType, kuboLoftPaint, kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap,
+      cassetteSupplier, griliatoType, griliatoHeight, griliatoCell,
       griliatoSupplier, griliatoMaterial,
       markup, color, customColorMarkup, area, complexity, objectType,
       lightingType, lightingSize, lightingColorBW, lightingQty, lightingMarkup
     });
   }, [
     mode, system, tier, armstrongBoard, kuboPanel, kuboSupplier, kuboWoodType,
-    kuboLoftType, kuboLoftPaint, cassetteSupplier, griliatoType, griliatoHeight, griliatoCell,
+    kuboLoftType, kuboLoftPaint, kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap,
+    cassetteSupplier, griliatoType, griliatoHeight, griliatoCell,
     griliatoSupplier, griliatoMaterial,
     markup, color, customColorMarkup, area, complexity, objectType,
     lightingType, lightingSize, lightingColorBW, lightingQty, lightingMarkup
@@ -846,6 +944,10 @@ export default function CeilingCalculator() {
         const materialCost = calcDecoformLoftCostPerM2(kuboLoftType, kuboLoftPaint);
         return (materialCost + KUBO_WORK_PER_M2) * complexityMult;
       }
+      if (kuboSupplier === "primet") {
+        const materialCost = calcKuboPrimetCostPerM2(kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap);
+        return (materialCost + KUBO_WORK_PER_M2) * complexityMult;
+      }
       const panelPrice = KUBO_PANELS[kuboPanel].price;
       return (panelPrice + KUBO_FITTINGS_PER_M2 + KUBO_WORK_PER_M2) * complexityMult;
     }
@@ -863,7 +965,7 @@ export default function CeilingCalculator() {
       return (materialCost + GRILIATO_WORK_PER_M2) * complexityMult;
     }
     return sys[tier] * complexityMult;
-  }, [isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, kuboLoftPaint, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, color, isCassette, cassetteSupplier, complexityMult, sys, tier]);
+  }, [isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, kuboLoftPaint, kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, color, isCassette, cassetteSupplier, complexityMult, sys, tier]);
 
   const calc = useMemo(() => {
     const a = Math.max(0, Number(area) || 0);
@@ -944,7 +1046,7 @@ export default function CeilingCalculator() {
     const systemLine = isArmstrong
       ? `${sys.label} — ${ARMSTRONG_BOARDS[armstrongBoard].label}`
       : isKubo
-      ? getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType)
+      ? getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType, kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap)
       : isGriliato
       ? `${GRILIATO_TYPE_LABELS[griliatoType]}${griliatoSupplier === "primet" ? ` (Primet, ${GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial]})` : ""} — ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}, ячейка ${griliatoCell}мм`
       : isCassette
@@ -966,7 +1068,7 @@ export default function CeilingCalculator() {
 💰 Ориентировочная стоимость: ${formatRub(calc.total)}${calc.isMinOrder ? " (минимальный заказ)" : ` (≈${formatRub(calc.pricePerM2Adjusted)}/м²)`}
 
 Готов ответить на вопросы.`;
-  }, [clientName, sys, tier, calc, objectType, isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, isCassette, cassetteSupplier, color]);
+  }, [clientName, sys, tier, calc, objectType, isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, isCassette, cassetteSupplier, color]);
 
   const handleCopyMessage = () => {
     navigator.clipboard.writeText(messageText);
@@ -993,7 +1095,7 @@ export default function CeilingCalculator() {
     const systemTitle = isArmstrong
       ? `${sys.label} — ${ARMSTRONG_BOARDS[armstrongBoard].label}`
       : isKubo
-      ? getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType)
+      ? getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType, kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap)
       : isGriliato
       ? `${GRILIATO_TYPE_LABELS[griliatoType]} — ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}`
       : isCassette
@@ -1548,6 +1650,9 @@ export default function CeilingCalculator() {
                     <TierButton active={kuboSupplier === "decoform_loft"} onClick={() => setKuboSupplier("decoform_loft")}>
                       Decoform Loft (дерево, Декоформ)
                     </TierButton>
+                    <TierButton active={kuboSupplier === "primet"} onClick={() => setKuboSupplier("primet")}>
+                      Primet (алюминий / оцинковка)
+                    </TierButton>
                   </div>
                 </Field>
 
@@ -1615,6 +1720,76 @@ export default function CeilingCalculator() {
                     )}
                     <p className="text-xs text-[#8A8F9C] -mt-1 leading-relaxed">
                       Материал {formatRub(calcDecoformLoftCostPerM2(kuboLoftType, kuboLoftPaint))}/м² (Декоформ) + монтаж ≈{formatRub(KUBO_WORK_PER_M2)}/м²
+                    </p>
+                  </>
+                )}
+
+                {kuboSupplier === "primet" && (
+                  <>
+                    <Field label="Размер рейки (Primet)">
+                      <select
+                        value={kuboPrimetSize}
+                        onChange={(e) => {
+                          const newSize = e.target.value;
+                          setKuboPrimetSize(newSize);
+                          const avail = KUBO_PRIMET_RAIL_PRICES[newSize][kuboPrimetMaterial];
+                          if (!avail || !avail[kuboPrimetColor]) {
+                            const fallbackMaterial = avail ? kuboPrimetMaterial : "aluminum";
+                            const colors = Object.keys(KUBO_PRIMET_RAIL_PRICES[newSize][fallbackMaterial]);
+                            setKuboPrimetMaterial(fallbackMaterial);
+                            setKuboPrimetColor(colors[0]);
+                          }
+                        }}
+                        className="w-full bg-[#20242C] border border-white/10 rounded-xl pl-3 pr-10 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#FF6A2B] focus:border-[#FF6A2B] hover:border-white/20 cursor-pointer transition-colors"
+                        style={{ backgroundColor: "#20242C", color: "#FFFFFF" }}
+                      >
+                        {KUBO_PRIMET_SIZES.map((s) => (
+                          <option key={s} value={s} style={{ backgroundColor: "#20242C", color: "#FFFFFF" }}>{s.replace("x", "×")} мм</option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Материал (Primet)">
+                      <div className="grid grid-cols-2 gap-2">
+                        {["aluminum", "zinc"].filter((m) => KUBO_PRIMET_RAIL_PRICES[kuboPrimetSize][m]).map((m) => (
+                          <TierButton
+                            key={m}
+                            active={kuboPrimetMaterial === m}
+                            onClick={() => {
+                              setKuboPrimetMaterial(m);
+                              const colors = Object.keys(KUBO_PRIMET_RAIL_PRICES[kuboPrimetSize][m]);
+                              if (!colors.includes(kuboPrimetColor)) setKuboPrimetColor(colors[0]);
+                            }}
+                          >
+                            {KUBO_PRIMET_MATERIAL_LABELS[m]}
+                          </TierButton>
+                        ))}
+                      </div>
+                    </Field>
+
+                    <Field label="Цвет (Primet)">
+                      <div className="grid grid-cols-3 gap-2">
+                        {Object.keys(KUBO_PRIMET_RAIL_PRICES[kuboPrimetSize][kuboPrimetMaterial] || {}).map((c) => (
+                          <TierButton key={c} active={kuboPrimetColor === c} onClick={() => setKuboPrimetColor(c)}>
+                            {KUBO_PRIMET_COLOR_LABELS[c]}
+                          </TierButton>
+                        ))}
+                      </div>
+                    </Field>
+
+                    <Field label="Шаг между рейками, мм">
+                      <input
+                        type="number"
+                        min="10"
+                        step="5"
+                        value={kuboPrimetGap}
+                        onChange={(e) => setKuboPrimetGap(e.target.value)}
+                        className="w-full bg-[#20242C] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#FF6A2B] focus:border-[#FF6A2B]"
+                      />
+                    </Field>
+
+                    <p className="text-xs text-[#8A8F9C] -mt-1 leading-relaxed">
+                      Материал {formatRub(calcKuboPrimetCostPerM2(kuboPrimetSize, kuboPrimetMaterial, kuboPrimetColor, kuboPrimetGap))}/м² (рейка Primet, дилерская цена + усреднённые крепёж/заглушки) + монтаж ≈{formatRub(KUBO_WORK_PER_M2)}/м². Гребёнка, соединитель и угол пристеночный у Primet даны только нормой расхода без цены — не включены отдельно.
                     </p>
                   </>
                 )}
