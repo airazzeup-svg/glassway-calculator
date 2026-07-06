@@ -267,6 +267,43 @@ const GRILIATO_PRICES = {
   }
 };
 
+// ---------- Грильято Классика: альтернативный поставщик Primet (прайс "Потолки PRiMET Дилер", июль 2026) ----------
+// В отличие от Файнберга, у Primet цена сразу ЗА М² по каждой ячейке (не за погонный метр) —
+// в позицию уже включены мама/папа/направляющие, БЕЗ угла пристеночного и подвесов (это отдельно).
+// Только 5 ячеек из прайса Primet — 40×40/60×60/86×86/120×120 у них не выпускаются.
+const GRILIATO_PRIMET_CELLS = ["50х50", "75х75", "100х100", "150х150", "200х200"];
+const GRILIATO_PRIMET_PRICES = {
+  zinc: {
+    eco30: {
+      white: { "50х50": 1552, "75х75": 1035.96, "100х100": 776, "150х150": 517.592, "200х200": 388 },
+      black: { "50х50": 1836, "75х75": 1225.53, "100х100": 918, "150х150": 612.306, "200х200": 459 },
+      graphite: { "50х50": 1836, "75х75": 1225.53, "100х100": 918, "150х150": 612.306, "200х200": 459 }
+    },
+    standard40: {
+      white: { "50х50": 1938, "75х75": 1293.615, "100х100": 969, "150х150": 646.323, "200х200": 484.5 },
+      black: { "50х50": 1960, "75х75": 1308.3, "100х100": 980, "150х150": 653.66, "200х200": 490 },
+      graphite: { "50х50": 1960, "75х75": 1308.3, "100х100": 980, "150х150": 653.66, "200х200": 490 }
+    }
+  },
+  aluminum: {
+    eco30: {
+      white: { "50х50": 2040, "75х75": 1361.7, "100х100": 1020, "150х150": 680.34, "200х200": 510 },
+      metallic: { "50х50": 2150, "75х75": 1435.125, "100х100": 1075, "150х150": 717.025, "200х200": 537.5 },
+      metallic_matte: { "50х50": 2150, "75х75": 1435.125, "100х100": 1075, "150х150": 717.025, "200х200": 537.5 },
+      graphite: { "50х50": 2280, "75х75": 1521.9, "100х100": 1140, "150х150": 760.38, "200х200": 570 },
+      black: { "50х50": 2216, "75х75": 1479.18, "100х100": 1108, "150х150": 739.036, "200х200": 554 }
+    },
+    standard40: {
+      white: { "50х50": 2524, "75х75": 1684.77, "100х100": 1262, "150х150": 841.754, "200х200": 631 },
+      metallic: { "50х50": 2690, "75х75": 1795.575, "100х100": 1345, "150х150": 897.115, "200х200": 672.5 },
+      metallic_matte: { "50х50": 2690, "75х75": 1795.575, "100х100": 1345, "150х150": 897.115, "200х200": 672.5 },
+      graphite: { "50х50": 2784, "75х75": 1858.32, "100х100": 1392, "150х150": 928.464, "200х200": 696 },
+      black: { "50х50": 2766, "75х75": 1846.305, "100х100": 1383, "150х150": 922.461, "200х200": 691.5 }
+    }
+  }
+};
+const GRILIATO_PRIMET_MATERIAL_LABELS = { zinc: "оцинковка", aluminum: "алюминий" };
+
 // Доп. позиции — только для Классики (у Файнберга для GL-15 пока нет отдельных цен на эти позиции)
 const GRILIATO_CLASSIC_CONNECTOR_PRICE = 10; // руб/шт, соединитель
 const GRILIATO_CLASSIC_SUSPENSION_PRICE = 15; // руб/шт, подвес
@@ -326,10 +363,28 @@ const GRILIATO_HEIGHT_LABELS = {
   standard40: "Стандарт (высота 40мм)"
 };
 
-function calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, area, griliatoCell) {
+function calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, area, griliatoCell, griliatoSupplier, griliatoMaterial) {
+  const cellNorms = GRILIATO_CLASSIC_NORMS[griliatoCell] || GRILIATO_CLASSIC_NORMS["100х100"];
+
+  if (griliatoSupplier === "primet") {
+    // Primet (прайс "Потолки PRiMET Дилер", июль 2026): цена сразу за м² на мама/папа/направляющие,
+    // без угла и подвесов. Эти комплектующие считаем по тем же нормам и ценам, что и у Файнберга.
+    const primetCell = GRILIATO_PRIMET_CELLS.includes(griliatoCell) ? griliatoCell : "100х100";
+    const materialPricePerM2 = GRILIATO_PRIMET_PRICES[griliatoMaterial][griliatoHeight][colorKey][primetCell];
+    const materialLabel = GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial];
+
+    const rows = [
+      { name: `Грильято Классика (Primet, ${materialLabel})`, qty: area, unit: "м²", costPerUnit: materialPricePerM2 },
+      { name: "Соединительный элемент", qty: Math.ceil(cellNorms.connector * area), unit: "шт", costPerUnit: GRILIATO_CLASSIC_CONNECTOR_PRICE },
+      { name: "Подвес", qty: ceilToMultiple(cellNorms.suspension * area, 100), unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE }
+    ];
+    const cornerM = ceilToMultiple(GRILIATO_CORNER_PER_M2_M * area, GRILIATO_CORNER_BOX_MULTIPLE_M);
+    rows.push({ name: "Уголок пристеночный (L=3м)", qty: ceilToMultiple(cornerM / 3, 1), unit: "шт", costPerUnit: GRILIATO_CLASSIC_CORNER_PRICE_PER_M * 3 });
+    return rows;
+  }
+
   const pricePerM = GRILIATO_PRICES[griliatoType][griliatoHeight][colorKey];
   const pricePerPiece = pricePerM * GRILIATO_PIECE_LENGTH;
-  const cellNorms = GRILIATO_CLASSIC_NORMS[griliatoCell] || GRILIATO_CLASSIC_NORMS["100х100"];
 
   if (griliatoType === "classic") {
     const box = GRILIATO_CLASSIC_BOX_MULTIPLES[griliatoHeight];
@@ -392,8 +447,8 @@ function calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, area, gri
   ];
 }
 
-function calcGriliatoCostPerM2(griliatoType, griliatoHeight, colorKey, griliatoCell) {
-  const breakdown = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, 1, griliatoCell);
+function calcGriliatoCostPerM2(griliatoType, griliatoHeight, colorKey, griliatoCell, griliatoSupplier, griliatoMaterial) {
+  const breakdown = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, 1, griliatoCell, griliatoSupplier, griliatoMaterial);
   return breakdown.reduce((sum, item) => sum + item.qty * item.costPerUnit, 0);
 }
 
@@ -631,6 +686,8 @@ export default function CeilingCalculator() {
   const [griliatoType, setGriliatoType] = useState(saved.griliatoType || "classic"); // classic | gl15
   const [griliatoHeight, setGriliatoHeight] = useState(saved.griliatoHeight || "eco30"); // eco30 | standard40
   const [griliatoCell, setGriliatoCell] = useState(saved.griliatoCell || "100х100"); // размер ячейки — влияет на состав подсистемы
+  const [griliatoSupplier, setGriliatoSupplier] = useState(saved.griliatoSupplier || "fainberg"); // fainberg | primet (только для Классики)
+  const [griliatoMaterial, setGriliatoMaterial] = useState(saved.griliatoMaterial || "zinc"); // zinc | aluminum — только для поставщика Primet
   const [markup, setMarkup] = useState(saved.markup ?? 10); // % наценки на закупку
   const [color, setColor] = useState(saved.color || "white");
   const [customColorMarkup, setCustomColorMarkup] = useState(saved.customColorMarkup ?? 15); // % доплаты за нестандартный цвет (RAL)
@@ -657,12 +714,14 @@ export default function CeilingCalculator() {
     saveParams({
       mode, system, tier, armstrongBoard, kuboPanel, kuboSupplier, kuboWoodType,
       kuboLoftType, kuboLoftPaint, cassetteSupplier, griliatoType, griliatoHeight, griliatoCell,
+      griliatoSupplier, griliatoMaterial,
       markup, color, customColorMarkup, area, complexity, objectType,
       lightingType, lightingSize, lightingColorBW, lightingQty, lightingMarkup
     });
   }, [
     mode, system, tier, armstrongBoard, kuboPanel, kuboSupplier, kuboWoodType,
     kuboLoftType, kuboLoftPaint, cassetteSupplier, griliatoType, griliatoHeight, griliatoCell,
+    griliatoSupplier, griliatoMaterial,
     markup, color, customColorMarkup, area, complexity, objectType,
     lightingType, lightingSize, lightingColorBW, lightingQty, lightingMarkup
   ]);
@@ -695,16 +754,16 @@ export default function CeilingCalculator() {
       return (panelPrice + KUBO_FITTINGS_PER_M2 + KUBO_WORK_PER_M2) * complexityMult;
     }
     if (isGriliato) {
-      // Грильято: только материал по прайсу Файнберга, без монтажа и без поправки на сложность —
+      // Грильято: только материал по прайсу поставщика, без монтажа и без поправки на сложность —
       // клиенту даём чёткую цену за материал, монтаж и сложность сюда не подмешиваются.
-      return calcGriliatoCostPerM2(griliatoType, griliatoHeight, color === CUSTOM_COLOR_KEY ? "white" : color, griliatoCell);
+      return calcGriliatoCostPerM2(griliatoType, griliatoHeight, color === CUSTOM_COLOR_KEY ? "white" : color, griliatoCell, griliatoSupplier, griliatoMaterial);
     }
     if (isCassette && cassetteSupplier === "grandline_closed") {
       const materialCost = calcCassetteGrandLineCostPerM2();
       return (materialCost + GRILIATO_WORK_PER_M2) * complexityMult; // монтаж кассетного — сопоставим с Грильято
     }
     return sys[tier] * complexityMult;
-  }, [isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, kuboLoftPaint, isGriliato, griliatoType, griliatoHeight, griliatoCell, color, isCassette, cassetteSupplier, complexityMult, sys, tier]);
+  }, [isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, kuboLoftPaint, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, color, isCassette, cassetteSupplier, complexityMult, sys, tier]);
 
   const calc = useMemo(() => {
     const a = Math.max(0, Number(area) || 0);
@@ -721,7 +780,7 @@ export default function CeilingCalculator() {
 
     if (isGriliato) {
       const colorForNorms = isCustomColor ? "white" : color;
-      griliatoBreakdownRows = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorForNorms, a, griliatoCell);
+      griliatoBreakdownRows = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorForNorms, a, griliatoCell, griliatoSupplier, griliatoMaterial);
       const materialCostSum = griliatoBreakdownRows.reduce((s, r) => s + r.qty * r.costPerUnit, 0) * colorMult;
       const materialSellSum = materialCostSum * markupMult;
       total = Math.max(materialSellSum, a > 0 ? minOrder : 0);
@@ -766,7 +825,7 @@ export default function CeilingCalculator() {
       stringerSparse,
       griliatoBreakdownRows
     };
-  }, [area, baseCostPerM2, markup, sys.speed, isKubo, kuboPanel, isGriliato, griliatoType, griliatoHeight, griliatoCell, color, customColorMarkup]);
+  }, [area, baseCostPerM2, markup, sys.speed, isKubo, kuboPanel, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, color, customColorMarkup]);
 
   const lightingCalc = useMemo(() => {
     const lt = LIGHTING_TYPES[lightingType];
@@ -787,7 +846,7 @@ export default function CeilingCalculator() {
       : isKubo
       ? getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType)
       : isGriliato
-      ? `${GRILIATO_TYPE_LABELS[griliatoType]} — ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}, ячейка ${griliatoCell}мм`
+      ? `${GRILIATO_TYPE_LABELS[griliatoType]}${griliatoSupplier === "primet" ? ` (Primet, ${GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial]})` : ""} — ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}, ячейка ${griliatoCell}мм`
       : `${sys.label}${tier === "premium" ? " (премиум-комплектация)" : ""}`;
     const colorLine = !isArmstrong
       ? color === CUSTOM_COLOR_KEY
@@ -805,7 +864,7 @@ export default function CeilingCalculator() {
 💰 Ориентировочная стоимость: ${formatRub(calc.total)}${calc.isMinOrder ? " (минимальный заказ)" : ` (≈${formatRub(calc.pricePerM2Adjusted)}/м²)`}
 
 Готов ответить на вопросы.`;
-  }, [clientName, sys, tier, calc, objectType, isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, isGriliato, griliatoType, griliatoHeight, griliatoCell, color]);
+  }, [clientName, sys, tier, calc, objectType, isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, color]);
 
   const handleCopyMessage = () => {
     navigator.clipboard.writeText(messageText);
@@ -857,7 +916,7 @@ export default function CeilingCalculator() {
 
       // Только материал, без монтажа и без поправки на сложность — точная цена за материал по площади.
       // Цвет уже указан в шапке документа, в каждой строке таблицы не дублируем.
-      const breakdown = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorForPrice, a, griliatoCell);
+      const breakdown = calcGriliatoBreakdown(griliatoType, griliatoHeight, colorForPrice, a, griliatoCell, griliatoSupplier, griliatoMaterial);
       const materialRows = breakdown.map((item) => ({
         name: item.name,
         qty: item.qty,
@@ -987,7 +1046,7 @@ export default function CeilingCalculator() {
 
   <h1>Коммерческое предложение № ${kpNumber} от ${dateStr} г.</h1>
   <div class="subtitle">Подвесной потолок: расчёт стоимости</div>
-  ${isGriliato ? `<div class="subtitle" style="margin-top:-14px;">${GRILIATO_TYPE_LABELS[griliatoType]}, ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}, ячейка ${griliatoCell} мм${colorText ? `, цвет: ${colorText}` : ""}</div>` : ""}
+  ${isGriliato ? `<div class="subtitle" style="margin-top:-14px;">${GRILIATO_TYPE_LABELS[griliatoType]}${griliatoSupplier === "primet" ? ` — поставщик Primet, ${GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial]}` : ""}, ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}, ячейка ${griliatoCell} мм${colorText ? `, цвет: ${colorText}` : ""}</div>` : ""}
 
   <div class="meta">
     <b>Исполнитель:</b> ООО "ГЛАССВЭЙ"<br/>
@@ -1468,12 +1527,60 @@ export default function CeilingCalculator() {
                     </TierButton>
                     <TierButton
                       active={griliatoType === "gl15"}
-                      onClick={() => setGriliatoType("gl15")}
+                      onClick={() => {
+                        setGriliatoType("gl15");
+                        setGriliatoSupplier("fainberg"); // у Primet пока нет своей GL-15 в калькуляторе
+                      }}
                     >
                       GL-15
                     </TierButton>
                   </div>
                 </Field>
+
+                {griliatoType === "classic" && (
+                  <Field label="Поставщик">
+                    <div className="grid grid-cols-2 gap-2">
+                      <TierButton
+                        active={griliatoSupplier === "fainberg"}
+                        onClick={() => setGriliatoSupplier("fainberg")}
+                      >
+                        Файнберг
+                      </TierButton>
+                      <TierButton
+                        active={griliatoSupplier === "primet"}
+                        onClick={() => {
+                          setGriliatoSupplier("primet");
+                          if (!GRILIATO_PRIMET_CELLS.includes(griliatoCell)) setGriliatoCell("100х100");
+                          if (griliatoMaterial === "zinc" && color !== "white" && color !== "black" && color !== "graphite") setColor("white");
+                        }}
+                      >
+                        Primet
+                      </TierButton>
+                    </div>
+                  </Field>
+                )}
+
+                {griliatoSupplier === "primet" && (
+                  <Field label="Материал (Primet)">
+                    <div className="grid grid-cols-2 gap-2">
+                      <TierButton
+                        active={griliatoMaterial === "zinc"}
+                        onClick={() => {
+                          setGriliatoMaterial("zinc");
+                          if (color !== "white" && color !== "black" && color !== "graphite") setColor("white");
+                        }}
+                      >
+                        Оцинковка
+                      </TierButton>
+                      <TierButton
+                        active={griliatoMaterial === "aluminum"}
+                        onClick={() => setGriliatoMaterial("aluminum")}
+                      >
+                        Алюминий
+                      </TierButton>
+                    </div>
+                  </Field>
+                )}
 
                 <Field label="Высота профиля">
                   <div className="grid grid-cols-2 gap-2">
@@ -1499,12 +1606,14 @@ export default function CeilingCalculator() {
                     className="w-full bg-[#20242C] border border-white/10 rounded-xl pl-3 pr-10 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#FF6A2B] focus:border-[#FF6A2B] hover:border-white/20 cursor-pointer transition-colors"
                     style={{ backgroundColor: "#20242C", color: "#FFFFFF" }}
                   >
-                    {GRILIATO_CLASSIC_CELLS.map((cell) => (
+                    {(griliatoSupplier === "primet" ? GRILIATO_PRIMET_CELLS : GRILIATO_CLASSIC_CELLS).map((cell) => (
                       <option key={cell} value={cell} style={{ backgroundColor: "#20242C", color: "#FFFFFF" }}>{cell} мм</option>
                     ))}
                   </select>
                   <p className="text-xs text-[#8A8F9C] mt-1.5 leading-relaxed">
-                    {griliatoType === "classic"
+                    {griliatoSupplier === "primet"
+                      ? "У Primet только эти 5 ячеек — остальные типоразмеры они не выпускают."
+                      : griliatoType === "classic"
                       ? "При ячейке от 86×86 добавляется несущая 1200мм, расход соединителя уменьшается вдвое."
                       : "У GL-15 расход элементов мама/папа зависит от ячейки так же, как у Классики; L-профиль и Т-профили — фиксированные нормы."}
                   </p>
@@ -1512,11 +1621,13 @@ export default function CeilingCalculator() {
 
                 <Field label="Цвет покрытия">
                   <div className="grid grid-cols-3 gap-2">
-                    {Object.entries(STANDARD_COLORS).map(([key, label]) => (
-                      <TierButton key={key} active={color === key} onClick={() => setColor(key)}>
-                        {label}
-                      </TierButton>
-                    ))}
+                    {Object.entries(STANDARD_COLORS)
+                      .filter(([key]) => !(griliatoSupplier === "primet" && griliatoMaterial === "zinc" && (key === "metallic" || key === "metallic_matte")))
+                      .map(([key, label]) => (
+                        <TierButton key={key} active={color === key} onClick={() => setColor(key)}>
+                          {label}
+                        </TierButton>
+                      ))}
                     <TierButton active={color === CUSTOM_COLOR_KEY} onClick={() => setColor(CUSTOM_COLOR_KEY)}>
                       Другой (RAL)
                     </TierButton>
@@ -1543,7 +1654,7 @@ export default function CeilingCalculator() {
                 </Field>
 
                 <p className="text-xs text-[#8A8F9C] -mt-1 leading-relaxed">
-                  Цена материала {formatRub(calcGriliatoCostPerM2(griliatoType, griliatoHeight, color === CUSTOM_COLOR_KEY ? "white" : color, griliatoCell))}/м² (закупка Файнберг, без монтажа)
+                  Цена материала {formatRub(calcGriliatoCostPerM2(griliatoType, griliatoHeight, color === CUSTOM_COLOR_KEY ? "white" : color, griliatoCell, griliatoSupplier, griliatoMaterial))}/м² (закупка {griliatoSupplier === "primet" ? `Primet, ${GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial]}` : "Файнберг"}, без монтажа)
                 </p>
               </>
             ) : isCassette ? (
@@ -1771,7 +1882,7 @@ export default function CeilingCalculator() {
                   ))}
                 </div>
                 <p className="text-xs text-[#8A8F9C] mt-3 leading-relaxed">
-                  Цены за штуку — закупка Файнберг. Для других цветов проверь актуальный прайс у поставщика.
+                  Цены за штуку — закупка {griliatoSupplier === "primet" ? `Primet (${GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial]})` : "Файнберг"}. Для других цветов проверь актуальный прайс у поставщика.
                 </p>
               </div>
             )}
