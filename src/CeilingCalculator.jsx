@@ -1131,9 +1131,77 @@ export default function CeilingCalculator() {
         sum: item.qty * item.costPerUnit * colorMult * markupMult
       }));
       rows.push(...materialRows);
+    } else if (isKubo && kuboSupplier === "primet") {
+      // Primet: полная номенклатура — рейка отдельной строкой (реальная цена и метраж),
+      // гребёнка/подвесы — количество для справки (цены на них поставщик не дал, см. подсказку в интерфейсе),
+      // крепёж/соединители/заглушки/угол — одной усреднённой строкой, и отдельно монтаж.
+      const a = calc.area;
+      const markupMult = 1 + Number(markup) / 100;
+      const width = getKuboPrimetWidth(kuboPrimetSize);
+      const moduleM = (width + Number(kuboPrimetGap)) / 1000;
+      const railMeters = moduleM > 0 ? Math.ceil(a / moduleM) : 0;
+      const railPrice = (KUBO_PRIMET_RAIL_PRICES[kuboPrimetSize][kuboPrimetMaterial] || {})[kuboPrimetColor] || 0;
+      const combMeters = ceilToMultiple(a * 0.84, 4);
+      const suspensionCount = Math.ceil(a * 0.84);
 
-      // Если применился минимальный заказ — отражаем разницу отдельной строкой,
-      // чтобы сумма таблицы точно совпадала с calc.total
+      rows.push({
+        name: `Рейка кубообразная ${kuboPrimetSize.replace("x", "×")} (Primet), ${KUBO_PRIMET_MATERIAL_LABELS[kuboPrimetMaterial]}, ${KUBO_PRIMET_COLOR_LABELS[kuboPrimetColor]}, шаг ${kuboPrimetGap}мм`,
+        qty: railMeters, unit: "м.п.",
+        price: railPrice * markupMult,
+        sum: railMeters * railPrice * markupMult
+      });
+      rows.push({ name: "Гребёнка (Primet, для справки — цена не заявлена поставщиком)", qty: combMeters, unit: "м.п.", price: 0, sum: 0 });
+      rows.push({ name: "Подвесы (Primet, для справки — цена не заявлена поставщиком)", qty: suspensionCount, unit: "шт", price: 0, sum: 0 });
+      rows.push({
+        name: "Крепёж и комплектующие (соединители, заглушки, угол — усреднённо)",
+        qty: a, unit: "м²",
+        price: KUBO_FITTINGS_PER_M2 * markupMult,
+        sum: a * KUBO_FITTINGS_PER_M2 * markupMult
+      });
+      rows.push({
+        name: `Монтаж кубообразного потолка «${systemTitle}»`,
+        qty: a, unit: "м²",
+        price: KUBO_WORK_PER_M2 * markupMult * complexityMult,
+        sum: a * KUBO_WORK_PER_M2 * markupMult * complexityMult
+      });
+      // Коэффициент сложности применяется к материалу и монтажу в основном расчёте — добавляем разницу отдельной строкой,
+      // чтобы сумма таблицы точно совпадала с calc.total (проще, чем размазывать множитель по всем строкам).
+      const rowsSumBeforeComplexity = rows.reduce((s, r) => s + r.sum, 0);
+      const target = calc.total;
+      if (Math.abs(target - rowsSumBeforeComplexity) > 1) {
+        rows.push({ name: "Коэффициент сложности монтажа", qty: 1, unit: "шт", price: target - rowsSumBeforeComplexity, sum: target - rowsSumBeforeComplexity });
+      }
+    } else if (isCassette && cassetteSupplier === "primet_clipin") {
+      const a = calc.area;
+      const markupMult = 1 + Number(markup) / 100;
+      const breakdown = calcCassettePrimetBreakdown(a);
+      breakdown.forEach((item) => {
+        rows.push({ name: item.name, qty: item.qty, unit: item.unit, price: item.costPerUnit * markupMult, sum: item.qty * item.costPerUnit * markupMult });
+      });
+      rows.push({
+        name: `Монтаж кассетного потолка «${systemTitle}»`,
+        qty: a, unit: "м²",
+        price: GRILIATO_WORK_PER_M2 * markupMult * complexityMult,
+        sum: a * GRILIATO_WORK_PER_M2 * markupMult * complexityMult
+      });
+      const rowsSumBeforeComplexity = rows.reduce((s, r) => s + r.sum, 0);
+      const target = calc.total;
+      if (Math.abs(target - rowsSumBeforeComplexity) > 1) {
+        rows.push({ name: "Коэффициент сложности монтажа", qty: 1, unit: "шт", price: target - rowsSumBeforeComplexity, sum: target - rowsSumBeforeComplexity });
+      }
+    } else {
+      rows.push({
+        name: `Подвесной потолок «${systemTitle}»${colorSuffix}`,
+        qty: calc.area,
+        unit: "м²",
+        price: calc.pricePerM2Adjusted,
+        sum: calc.pricePerM2Adjusted * calc.area
+      });
+    }
+
+    // Если для Грильято применился минимальный заказ — отражаем разницу отдельной строкой,
+    // чтобы сумма таблицы точно совпадала с calc.total
+    if (isGriliato) {
       const rowsSum = rows.reduce((s, r) => s + r.sum, 0);
       if (calc.isMinOrder && calc.total > rowsSum) {
         rows.push({
@@ -1144,14 +1212,6 @@ export default function CeilingCalculator() {
           sum: calc.total - rowsSum
         });
       }
-    } else {
-      rows.push({
-        name: `Подвесной потолок «${systemTitle}»${colorSuffix}`,
-        qty: calc.area,
-        unit: "м²",
-        price: calc.pricePerM2Adjusted,
-        sum: calc.pricePerM2Adjusted * calc.area
-      });
     }
 
     const total = calc.total;
