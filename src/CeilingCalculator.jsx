@@ -26,7 +26,8 @@ const ARMSTRONG_BOARDS = {
   dune_tegular15: { label: "DUNE Supreme Tegular 15", price: 1638.70 },
   ac_600: { label: "АС Панель 600 (Спецстрой-Р)", price: 895.97 },
   ac_1200: { label: "АС Панель 1200×600 (Спецстрой-Р)", price: 1134.50 },
-  artus_7: { label: "ARTUS Board 7мм SA (Спецстрой-Р)", price: 326.13 }
+  artus_7: { label: "ARTUS Board 7мм SA (Спецстрой-Р)", price: 326.13 },
+  primet_don: { label: "PRIMET Дон 7мм (Primet)", price: 368.33 }
 };
 
 // Усреднённый расход каркаса T-24 (Албес) + крепёж на 1 м2.
@@ -251,6 +252,45 @@ function calcCassetteGrandLineCostPerM2() {
   return breakdown.reduce((sum, item) => sum + item.qty * item.costPerUnit, 0);
 }
 
+// ---------- Кассета скрытого типа (Clip-in) 600×600 — поставщик Primet (прайс "Потолки PRiMET Дилер", июль 2026) ----------
+// Кассета: оцинкованная закрытого типа ЗС, кромка 90°, белый матовый, 0,5мм — цена за м² дана прямо в прайсе.
+// Остальные комплектующие — нормы из их же листа "Расчёт подвесной системы" (раздел "Кассета Clip-in 600×600", заказ 500м²).
+// Профиль угловой пристеночный и "ПП 27×28" у Primet в расчёте помечены "по расчёту" (зависят от периметра
+// помещения, не от площади) — в калькулятор пока не включены, их считают отдельно по замеру объекта.
+const CASSETTE_PRIMET_PRICE_PER_M2 = 1176.77; // руб/м², кассета ЗС 600×600 К90, белый матовый, 0,5мм
+const CASSETTE_PRIMET_NORMS_PER_M2 = {
+  stringer: 1.67,        // м.п./м², Стрингер ЗС PRIMET L=4000мм
+  eurosuspension: 1.67,  // шт/м², Европодвес (принят L=500мм по умолчанию)
+  ppProfile: 1,          // м.п./м², Профиль ПП 60×27 PRIMET ЭТАЛОН
+  twoLevelConnector: 1.67, // шт/м², Соединитель двухуровневый для стрингера
+  extender: 0.3333       // шт/м², Удлинитель профилей 60×80
+};
+const CASSETTE_PRIMET_PRICES = {
+  stringer: 86.7,           // руб/м.п.
+  eurosuspension: 6.9,      // руб/шт, Европодвес L=500мм
+  ppProfile: 63.35,         // руб/м.п.
+  twoLevelConnector: 9.45,  // руб/шт
+  extender: 6.65            // руб/шт
+};
+
+function calcCassettePrimetBreakdown(area) {
+  const n = CASSETTE_PRIMET_NORMS_PER_M2;
+  const p = CASSETTE_PRIMET_PRICES;
+  return [
+    { name: "Кассета ЗС Primet 600×600 К90, белый матовый", qty: Math.ceil((area / 0.36) * 100) / 100, unit: "шт", costPerUnit: CASSETTE_PRIMET_PRICE_PER_M2 * 0.36 },
+    { name: "Стрингер ЗС Primet L=4000мм", qty: n.stringer * area, unit: "м.п.", costPerUnit: p.stringer },
+    { name: "Профиль ПП 60×27 Primet ЭТАЛОН", qty: n.ppProfile * area, unit: "м.п.", costPerUnit: p.ppProfile },
+    { name: "Европодвес L=500мм (Primet)", qty: n.eurosuspension * area, unit: "шт", costPerUnit: p.eurosuspension },
+    { name: "Соединитель двухуровневый для стрингера (Primet)", qty: n.twoLevelConnector * area, unit: "шт", costPerUnit: p.twoLevelConnector },
+    { name: "Удлинитель профилей 60×80 (Primet)", qty: n.extender * area, unit: "шт", costPerUnit: p.extender }
+  ];
+}
+
+function calcCassettePrimetCostPerM2() {
+  const breakdown = calcCassettePrimetBreakdown(1);
+  return breakdown.reduce((sum, item) => sum + item.qty * item.costPerUnit, 0);
+}
+
 // ---------- Грильято: цены Файнберг (счёт-прайс, цена за метр переведена в цену за штуку, длина штуки 0.6м) ----------
 // Структура: тип (Классика/GL-15) × высота (Эконом 30мм/Стандарт 40мм) × цвет.
 const GRILIATO_PIECE_LENGTH = 0.6; // м, длина одной штуки мама/папа
@@ -303,6 +343,55 @@ const GRILIATO_PRIMET_PRICES = {
   }
 };
 const GRILIATO_PRIMET_MATERIAL_LABELS = { zinc: "оцинковка", aluminum: "алюминий" };
+
+// Собственные нормы расхода Primet на комплектующие (лист "Расчёт подвесной системы" их прайса,
+// расчёт при заказе 100/1000 м² — нормы приведены к 1 м²). У цинка нет направляющей L=1,2м
+// (в их расчёте отдельно указано "Расчёт выполнен без профиля 1,2 м."), у алюминия — есть,
+// но с более грубым шагом сетки на больших ячейках.
+const GRILIATO_PRIMET_ZINC_SMALL_CELLS = ["50х50", "75х75", "100х100"]; // подвес/соединитель гуще
+const GRILIATO_PRIMET_ALU_SMALL_CELLS = ["50х50", "75х75"]; // подвес/соединитель/L1.2/L2.4 гуще
+
+function getGriliatoPrimetNorms(griliatoMaterial, griliatoCell) {
+  if (griliatoMaterial === "zinc") {
+    const isSmall = GRILIATO_PRIMET_ZINC_SMALL_CELLS.includes(griliatoCell);
+    return { l12: 0, l24: 0.7, connector: 0.7, suspension: isSmall ? 1.85 : 0.93 };
+  }
+  const isSmall = GRILIATO_PRIMET_ALU_SMALL_CELLS.includes(griliatoCell);
+  return {
+    l12: isSmall ? 0 : 1.39,
+    l24: isSmall ? 0.7 : 0.35,
+    connector: isSmall ? 0.7 : 0.35,
+    suspension: isSmall ? 1.85 : 0.93
+  };
+}
+
+// Цены направляющих (L=1,2м и L=2,4м) — руб/пог.м, отдельная позиция сверх базовой цены за м²
+// (которая уже включает мама/папа/напр.0,6м). У цинка нет L=1,2 вовсе.
+const GRILIATO_PRIMET_INCIDENT_PRICES = {
+  zinc: {
+    eco30: { white: { l24: 93.12 }, black: { l24: 110.16 }, graphite: { l24: 110.16 } },
+    standard40: { white: { l24: 116.28 }, black: { l24: 117.6 }, graphite: { l24: 117.6 } }
+  },
+  aluminum: {
+    eco30: {
+      white: { l12: 61.2, l24: 122.4 },
+      metallic: { l12: 64.5, l24: 129 },
+      metallic_matte: { l12: 64.5, l24: 129 },
+      graphite: { l12: 68.4, l24: 136.8 },
+      black: { l12: 66.48, l24: 132.96 }
+    },
+    standard40: {
+      white: { l12: 75.72, l24: 151.44 },
+      metallic: { l12: 80.7, l24: 161.4 },
+      metallic_matte: { l12: 80.7, l24: 161.4 },
+      graphite: { l12: 83.52, l24: 167.04 },
+      black: { l12: 82.98, l24: 165.96 }
+    }
+  }
+};
+// Соединитель и подвес — собственные комплектующие Primet (лист "Грильято" и "Комплектующие" их прайса)
+const GRILIATO_PRIMET_CONNECTOR_PRICE = 8.6; // руб/шт, "Соединительный профиль" (лист Грильято)
+const GRILIATO_PRIMET_SUSPENSION_PRICE = 14.8; // руб/шт, "Подвес анкерный поворотный Zn" (лист Комплектующие)
 
 // Доп. позиции — только для Классики (у Файнберга для GL-15 пока нет отдельных цен на эти позиции)
 const GRILIATO_CLASSIC_CONNECTOR_PRICE = 10; // руб/шт, соединитель
@@ -367,17 +456,24 @@ function calcGriliatoBreakdown(griliatoType, griliatoHeight, colorKey, area, gri
   const cellNorms = GRILIATO_CLASSIC_NORMS[griliatoCell] || GRILIATO_CLASSIC_NORMS["100х100"];
 
   if (griliatoSupplier === "primet") {
-    // Primet (прайс "Потолки PRiMET Дилер", июль 2026): цена сразу за м² на мама/папа/направляющие,
-    // без угла и подвесов. Эти комплектующие считаем по тем же нормам и ценам, что и у Файнберга.
+    // Primet (прайс "Потолки PRiMET Дилер", июль 2026): цена сразу за м² на мама/папа/направляющая 0,6м,
+    // без угла и подвесов. Направляющие 1,2/2,4м, соединитель и подвес — их собственные нормы и цены
+    // (лист "Расчёт подвесной системы" их прайса), не нормы Файнберга.
     const primetCell = GRILIATO_PRIMET_CELLS.includes(griliatoCell) ? griliatoCell : "100х100";
     const materialPricePerM2 = GRILIATO_PRIMET_PRICES[griliatoMaterial][griliatoHeight][colorKey][primetCell];
     const materialLabel = GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial];
+    const norms = getGriliatoPrimetNorms(griliatoMaterial, primetCell);
+    const incidentPrices = GRILIATO_PRIMET_INCIDENT_PRICES[griliatoMaterial][griliatoHeight][colorKey];
 
     const rows = [
-      { name: `Грильято Классика (Primet, ${materialLabel})`, qty: area, unit: "м²", costPerUnit: materialPricePerM2 },
-      { name: "Соединительный элемент", qty: Math.ceil(cellNorms.connector * area), unit: "шт", costPerUnit: GRILIATO_CLASSIC_CONNECTOR_PRICE },
-      { name: "Подвес", qty: ceilToMultiple(cellNorms.suspension * area, 100), unit: "шт", costPerUnit: GRILIATO_CLASSIC_SUSPENSION_PRICE }
+      { name: `Грильято Классика (Primet, ${materialLabel})`, qty: area, unit: "м²", costPerUnit: materialPricePerM2 }
     ];
+    if (norms.l12 > 0) {
+      rows.push({ name: "Направляющая 1,2м (Primet)", qty: Math.ceil(norms.l12 * area), unit: "шт", costPerUnit: incidentPrices.l12 * 1.2 });
+    }
+    rows.push({ name: "Направляющая 2,4м (Primet)", qty: Math.ceil(norms.l24 * area), unit: "шт", costPerUnit: incidentPrices.l24 * 2.4 });
+    rows.push({ name: "Соединительный профиль (Primet)", qty: Math.ceil(norms.connector * area), unit: "шт", costPerUnit: GRILIATO_PRIMET_CONNECTOR_PRICE });
+    rows.push({ name: "Подвес (Primet)", qty: ceilToMultiple(norms.suspension * area, 100), unit: "шт", costPerUnit: GRILIATO_PRIMET_SUSPENSION_PRICE });
     const cornerM = ceilToMultiple(GRILIATO_CORNER_PER_M2_M * area, GRILIATO_CORNER_BOX_MULTIPLE_M);
     rows.push({ name: "Уголок пристеночный (L=3м)", qty: ceilToMultiple(cornerM / 3, 1), unit: "шт", costPerUnit: GRILIATO_CLASSIC_CORNER_PRICE_PER_M * 3 });
     return rows;
@@ -762,6 +858,10 @@ export default function CeilingCalculator() {
       const materialCost = calcCassetteGrandLineCostPerM2();
       return (materialCost + GRILIATO_WORK_PER_M2) * complexityMult; // монтаж кассетного — сопоставим с Грильято
     }
+    if (isCassette && cassetteSupplier === "primet_clipin") {
+      const materialCost = calcCassettePrimetCostPerM2();
+      return (materialCost + GRILIATO_WORK_PER_M2) * complexityMult;
+    }
     return sys[tier] * complexityMult;
   }, [isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, kuboLoftPaint, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, color, isCassette, cassetteSupplier, complexityMult, sys, tier]);
 
@@ -847,6 +947,8 @@ export default function CeilingCalculator() {
       ? getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType)
       : isGriliato
       ? `${GRILIATO_TYPE_LABELS[griliatoType]}${griliatoSupplier === "primet" ? ` (Primet, ${GRILIATO_PRIMET_MATERIAL_LABELS[griliatoMaterial]})` : ""} — ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}, ячейка ${griliatoCell}мм`
+      : isCassette
+      ? `${sys.label}${cassetteSupplier === "grandline_closed" ? " — Grand Line закрытый тип" : cassetteSupplier === "primet_clipin" ? " — Primet Clip-in" : ""}`
       : `${sys.label}${tier === "premium" ? " (премиум-комплектация)" : ""}`;
     const colorLine = !isArmstrong
       ? color === CUSTOM_COLOR_KEY
@@ -864,7 +966,7 @@ export default function CeilingCalculator() {
 💰 Ориентировочная стоимость: ${formatRub(calc.total)}${calc.isMinOrder ? " (минимальный заказ)" : ` (≈${formatRub(calc.pricePerM2Adjusted)}/м²)`}
 
 Готов ответить на вопросы.`;
-  }, [clientName, sys, tier, calc, objectType, isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, color]);
+  }, [clientName, sys, tier, calc, objectType, isArmstrong, armstrongBoard, isKubo, kuboPanel, kuboSupplier, kuboWoodType, kuboLoftType, isGriliato, griliatoType, griliatoHeight, griliatoCell, griliatoSupplier, griliatoMaterial, isCassette, cassetteSupplier, color]);
 
   const handleCopyMessage = () => {
     navigator.clipboard.writeText(messageText);
@@ -894,6 +996,8 @@ export default function CeilingCalculator() {
       ? getKuboLabel(kuboSupplier, kuboPanel, kuboWoodType, kuboLoftType)
       : isGriliato
       ? `${GRILIATO_TYPE_LABELS[griliatoType]} — ${GRILIATO_HEIGHT_LABELS[griliatoHeight]}`
+      : isCassette
+      ? `${sys.label}${cassetteSupplier === "grandline_closed" ? " — Grand Line закрытый тип" : cassetteSupplier === "primet_clipin" ? " — Primet Clip-in" : ""}`
       : `${sys.label}${tier === "premium" ? " (премиум-комплектация)" : ""}`;
 
     const colorText = !isArmstrong
@@ -1667,6 +1771,9 @@ export default function CeilingCalculator() {
                     <TierButton active={cassetteSupplier === "grandline_closed"} onClick={() => setCassetteSupplier("grandline_closed")}>
                       Grand Line закрытый тип (RAL 9010)
                     </TierButton>
+                    <TierButton active={cassetteSupplier === "primet_clipin"} onClick={() => setCassetteSupplier("primet_clipin")}>
+                      Primet Clip-in 600×600 (белый матовый)
+                    </TierButton>
                   </div>
                 </Field>
                 {cassetteSupplier === "eco" ? (
@@ -1680,9 +1787,13 @@ export default function CeilingCalculator() {
                       </TierButton>
                     </div>
                   </Field>
-                ) : (
+                ) : cassetteSupplier === "grandline_closed" ? (
                   <p className="text-xs text-[#8A8F9C] -mt-1 leading-relaxed">
                     Закупка материала {formatRub(calcCassetteGrandLineCostPerM2())}/м² (Металлист, счёт №УО-00802754) + монтаж ≈{formatRub(GRILIATO_WORK_PER_M2)}/м²
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#8A8F9C] -mt-1 leading-relaxed">
+                    Закупка материала {formatRub(calcCassettePrimetCostPerM2())}/м² (Primet) + монтаж ≈{formatRub(GRILIATO_WORK_PER_M2)}/м². Угол пристеночный по периметру — отдельно, по замеру.
                   </p>
                 )}
               </>
