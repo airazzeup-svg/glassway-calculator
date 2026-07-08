@@ -1345,9 +1345,9 @@ export default function CeilingCalculator() {
   </div>
 
   <div class="signature">
-    <b>Менеджер Glassway</b>
-    email: info@glassway.group<br/>
-    телефон: +7 (495) 136-50-70
+    <b>Азим Закирович</b><br/>
+    email: azim@glassway.group<br/>
+    телефон: +7 962 993-75-75
   </div>
 
   <img class="footer-pattern" src="${GLASSWAY_FOOTER_PATTERN_BASE64}" alt="" />
@@ -1413,7 +1413,8 @@ export default function CeilingCalculator() {
       iframe.style.left = "-99999px";
       iframe.style.top = "0";
       iframe.style.width = "900px";
-      iframe.style.height = "1px";
+      iframe.style.height = "1200px"; // временная высота — сразу подгоняем под реальный контент ниже
+      iframe.style.border = "0";
       document.body.appendChild(iframe);
 
       await new Promise((resolve, reject) => {
@@ -1422,6 +1423,20 @@ export default function CeilingCalculator() {
         iframe.srcdoc = kpDocument;
       });
 
+      // КРИТИЧНО: без реальной высоты iframe его внутренний viewport остаётся
+      // схлопнутым, и html2canvas захватывает пустую страницу. Подгоняем высоту
+      // iframe под фактическую высоту содержимого перед рендером в PDF.
+      const doc = iframe.contentDocument;
+      const contentHeight = Math.max(
+        doc.documentElement.scrollHeight,
+        doc.body.scrollHeight,
+        doc.documentElement.offsetHeight,
+        doc.body.offsetHeight
+      );
+      iframe.style.height = `${contentHeight}px`;
+      // Даём браузеру такт на релейаут перед захватом
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
       const targetNode = iframe.contentDocument.body;
       const filename = `Glassway_KP_no${kpNumber}.pdf`;
 
@@ -1429,7 +1444,7 @@ export default function CeilingCalculator() {
         .set({
           margin: 0,
           filename,
-          html2canvas: { scale: 2, useCORS: true, windowWidth: 900 },
+          html2canvas: { scale: 2, useCORS: true, windowWidth: 900, windowHeight: contentHeight },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           pagebreak: { mode: ["css", "legacy"] }
         })
