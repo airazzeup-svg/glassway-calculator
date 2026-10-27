@@ -384,32 +384,34 @@ function calcCassettePrimetCostPerM2() {
 const GRILIATO_PIECE_LENGTH = 0.6; // м, длина одной штуки мама/папа
 
 // ---------- Грильято Классика: поставщик Спецстрой-Р (КП №33030 от 27.10.2026) ----------
-// Цены ЗА ШТУКУ (L=0.6м), одинаковы для всех ячеек и обеих высот (30/40мм)
+// Цены ЗА ШТУКУ (L=0.6м). В прайсе только H40 (высота 40мм), используем для обоих H30/H40.
+// Направляющие кратны 0.6м: L=1.2м = price×2, L=2.4м = price×4 (проверено по прайсу).
 const GRILIATO_SPECSTROY_PRICES = {
-  white:          37.91, // RAL 9003 белый матовый
-  metallic:       40.62, // металлик
+  white:          37.91, // A903RUS01 белый матовый алюм.
+  metallic:       40.62, // A907РУС04 металлик алюм.
   metallic_matte: 40.62,
-  graphite:       41.08,
-  black:          41.08  // RAL 9011 чёрный
+  graphite:       41.08, // берём как чёрный — отдельной позиции нет
+  black:          41.08  // A911РУС08/А911РУС06 чёрный алюм.
 };
-const GRILIATO_SPECSTROY_SUSPENSION_PRICE = 7.31;   // руб/шт, Подвес Грильято 0.5м
+const GRILIATO_SPECSTROY_SUSPENSION_PRICE = 7.31;   // руб/шт, Подвес "Грильято" 0.5м (арт. 201)
 const GRILIATO_SPECSTROY_CORNER_PRICE_PER_M = {
   white:          40,    // нет в прайсе — берём стандарт Файнберга
-  metallic:       69.64, // алюм. металлик L=3м ÷ 3
+  metallic:       69.64, // арт. 24782, PL 19х24 металлик алюм L=3м → 208.92₽/шт ÷ 3
   metallic_matte: 69.64,
-  graphite:       69.55, // алюм. чёрный L=3м ÷ 3
+  graphite:       69.55, // арт. 347221, PL 19х24 чёрный алюм L=3м → 208.65₽/шт ÷ 3
   black:          69.55
 };
 
 // Цены за ПОГОННЫЙ МЕТР от Файнберга — храним как есть, переводим в шт в формуле (price * 0.6)
+// +20% к исходным ценам (обновлено 27.10.2026)
 const GRILIATO_PRICES = {
   classic: {
-    eco30: { white: 40, black: 42, metallic: 41, metallic_matte: 43, graphite: 43 },
-    standard40: { white: 48, black: 50, metallic: 49, metallic_matte: 51, graphite: 51 }
+    eco30: { white: 48, black: 50.4, metallic: 49.2, metallic_matte: 51.6, graphite: 51.6 },
+    standard40: { white: 57.6, black: 60, metallic: 58.8, metallic_matte: 61.2, graphite: 61.2 }
   },
   gl15: {
-    eco30: { white: 45, black: 47, metallic: 46, metallic_matte: 48, graphite: 48 },
-    standard40: { white: 55, black: 57, metallic: 56, metallic_matte: 58, graphite: 58 }
+    eco30: { white: 54, black: 56.4, metallic: 55.2, metallic_matte: 57.6, graphite: 57.6 },
+    standard40: { white: 66, black: 68.4, metallic: 67.2, metallic_matte: 69.6, graphite: 69.6 }
   }
 };
 
